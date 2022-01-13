@@ -2,6 +2,7 @@ from torchvision.datasets import *
 from .base import *
 from .coco import COCOSegmentation
 from .ade20k import ADE20KSegmentation
+from .hsi_dataset import HSIDataset
 from .pascal_voc import VOCSegmentation
 from .pascal_aug import VOCAugSegmentation
 from .pcontext import ContextSegmentation
@@ -24,7 +25,8 @@ datasets = {
     'bladder': Bladder,
     'chaos' : CHAOS,
     'promise12': Promise12,
-    'camvid': CamVid
+    'camvid': CamVid,
+    'hsi': HSIDataset
 }
 
 acronyms = {
@@ -43,9 +45,10 @@ acronyms = {
     'camvid': 'camvid'
 }
 
-dir = '/train_tiny_data/imgseg/'
+# dir = '/train_tiny_data/imgseg/'
 #=
 #dir = '../../../training_data/imageSeg/'
+dir = '/projects/datasets/UOW-HSI-v2'
 
 def get_dataset(name, path=dir, **kwargs):
     return datasets[name.lower()](root = path, **kwargs)

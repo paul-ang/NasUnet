@@ -11,6 +11,8 @@ import torch.nn.functional as F
 import torch.backends.cudnn as cudnn
 import torchvision.transforms as transform
 
+from util.datasets.hsi_dataset import get_training_dataloaders
+
 sys.path.append('..')
 from util.loss.loss import SegmentationLosses
 from util.datasets import get_dataset, datasets
@@ -35,7 +37,7 @@ class SearchNetwork(object):
 
     def _init_configure(self):
         parser = argparse.ArgumentParser(description='config')
-        parser.add_argument('--config', nargs='?',type=str,default='../configs/nas_unet/nas_unet_voc.yml',
+        parser.add_argument('--config', nargs='?',type=str,default='../configs/nas_unet/nas_unet_hsi.yml',
                             help='Configuration file to use')
 
         self.args = parser.parse_args()
@@ -72,21 +74,24 @@ class SearchNetwork(object):
             self.device_id = 0
 
     def _init_dataset(self):
-        trainset = get_dataset(self.cfg['data']['dataset'], split='train', mode='train')
+        # trainset = get_dataset(self.cfg['data']['dataset'], split='train', mode='train')
+        #
+        # num_train = len(trainset)
+        # indices = list(range(num_train))
+        # split = int(np.floor(self.cfg['searching']['train_portion'] * num_train))
 
-        num_train = len(trainset)
-        indices = list(range(num_train))
-        split = int(np.floor(self.cfg['searching']['train_portion'] * num_train))
-        self.n_classes = trainset.num_class
-        self.in_channels = trainset.in_channels
-        kwargs = {'num_workers': self.cfg['searching']['n_workers'], 'pin_memory': True}
-        self.train_queue = data.DataLoader(trainset, batch_size=self.cfg['searching']['batch_size'],
-                                           sampler=torch.utils.data.sampler.SubsetRandomSampler(
-                                               indices[:split]), **kwargs)
+        # kwargs = {'num_workers': self.cfg['searching']['n_workers'], 'pin_memory': True}
+        # self.train_queue = data.DataLoader(trainset, batch_size=self.cfg['searching']['batch_size'],
+        #                                    sampler=torch.utils.data.sampler.SubsetRandomSampler(
+        #                                        indices[:split]), **kwargs)
+        #
+        # self.valid_queue = data.DataLoader(trainset, batch_size=self.cfg['searching']['batch_size'],
+        #                                    sampler=torch.utils.data.sampler.SubsetRandomSampler(
+        #                                        indices[split:num_train]),**kwargs)
 
-        self.valid_queue = data.DataLoader(trainset, batch_size=self.cfg['searching']['batch_size'],
-                                           sampler=torch.utils.data.sampler.SubsetRandomSampler(
-                                               indices[split:num_train]),**kwargs)
+        self.train_queue, self.valid_queue, _ = get_training_dataloaders(self.cfg['searching']['batch_size'], self.cfg['searching']['n_workers'], '/projects/datasets/UOW-HSI-v2', fold=1)
+        self.n_classes = 5
+        self.in_channels = 25
 
     def _init_model(self):
 

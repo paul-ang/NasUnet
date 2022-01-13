@@ -81,6 +81,70 @@ class SearchULikeCNN(nn.Module):
 
         return x
 
+class SizeNormLayer(nn.Module):
+    """
+    - [SizeNormLayer] is a class that can pad the input N-D tensor so that the size
+     in each dimension can be divisible by a divisible_number (default = 16).
+
+    - This class can also crop the input N-D tensor given a padding size.
+
+    Note that the format of the input data: (batch, n_channels, 1st_size, ..., nth_size)
+    """
+
+    def __init__(self, mode="pad", divisible_number=16):
+        """
+        :param mode: "pad" or "crop"
+        """
+        super(SizeNormLayer, self).__init__()
+        self.mode = mode
+        self.divisible_number = divisible_number
+        self.padding = []
+
+    def forward(self, x, padding=None):
+        if self.mode == "pad":  # do padding
+            # Compute the padding amount so that each dimension is divisible
+            # by divisible_number
+            padding = self.compute_padding(x)
+            self.padding = padding
+
+            # Apply padding
+            x = nn.functional.pad(x, padding)
+
+            return x
+
+        else:  # do cropping
+            # Cropping by padding with minus amount of padding
+            padding = tuple([-p for p in padding])
+            # print('cropping', padding)
+
+            # Apply cropping
+            x = nn.functional.pad(x, padding)
+
+            return x
+
+    def compute_padding(self, x):
+        """
+        Computes the padding for each spatial dim (exclude depth) so that it is
+        divisible by divisible_number
+        :param x: N-D tensor with the data format
+        :param divisible_number:
+        :return: padding value at each dimension, e.g. 2D->(d2_p1, d2_p2, d1_p1, d1_p2)
+        """
+        padding = []
+        input_shape_list = x.size()
+
+        # Reversed because pytorch's pad() receive in a reversed order
+        for org_size in reversed(input_shape_list[2:]):
+            # compute the padding amount in two sides
+            p = np.int32((np.int32((org_size - 1) / self.divisible_number) + 1)
+                         * self.divisible_number - org_size)
+            # padding amount in one size
+            p1 = np.int32(p / 2)
+            padding.append(p1)
+            padding.append(p - p1)
+
+        return tuple(padding)
+
 
 class NasUnetSearch(nn.Module):
 
@@ -101,6 +165,8 @@ class NasUnetSearch(nn.Module):
 
         # Initialize architecture parameters: alpha
         self._init_alphas()
+        self.norm_input = SizeNormLayer(mode='pad', divisible_number=2 ** depth)
+        self.recovery_size = SizeNormLayer(mode='crop')
 
 
     def _init_alphas(self):
@@ -171,6 +237,7 @@ class NasUnetSearch(nn.Module):
         return geno_type
 
     def forward(self, x):
+        x = self.norm_input(x)
 
         weights1_down = F.softmax(self.alphas_normal_down, dim=-1)
         weights1_up = F.softmax(self.alphas_normal_up, dim=-1)
@@ -178,23 +245,24 @@ class NasUnetSearch(nn.Module):
         weights2_up = F.softmax(self.alphas_up, dim=-1)
 
         if len(self.device_ids) == 1:
-            return self.net(x, weights1_down, weights1_up, weights2_down, weights2_up)
+            return self.recovery_size(self.net(x, weights1_down, weights1_up, weights2_down, weights2_up), self.norm_input.padding)
 
-        # scatter x
-        xs = nn.parallel.scatter(x, self.device_ids)
-        # broadcast weights
-        wnormal_down_copies = broadcast_list(weights1_down, self.device_ids)
-        wnormal_up_copies = broadcast_list(weights1_up, self.device_ids)
-        wdown_copies = broadcast_list(weights2_down, self.device_ids)
-        wup_copies = broadcast_list(weights2_up, self.device_ids)
-
-        # replicate modules
-        replicas = nn.parallel.replicate(self.net, self.device_ids)
-        outputs = nn.parallel.parallel_apply(replicas, list(zip(xs, wnormal_down_copies, wnormal_up_copies,
-                                                                wdown_copies, wup_copies)),
-                                                                devices=self.device_ids)
-
-        return nn.parallel.gather(outputs, self.device_ids[0])
+        raise NotImplementedError
+        # # scatter x
+        # xs = nn.parallel.scatter(x, self.device_ids)
+        # # broadcast weights
+        # wnormal_down_copies = broadcast_list(weights1_down, self.device_ids)
+        # wnormal_up_copies = broadcast_list(weights1_up, self.device_ids)
+        # wdown_copies = broadcast_list(weights2_down, self.device_ids)
+        # wup_copies = broadcast_list(weights2_up, self.device_ids)
+        #
+        # # replicate modules
+        # replicas = nn.parallel.replicate(self.net, self.device_ids)
+        # outputs = nn.parallel.parallel_apply(replicas, list(zip(xs, wnormal_down_copies, wnormal_up_copies,
+        #                                                         wdown_copies, wup_copies)),
+        #                                                         devices=self.device_ids)
+        #
+        # return self.recovery_size(nn.parallel.gather(outputs, self.device_ids[0]), self.norm_input.padding)
 
     def alphas(self):
         for n, p in self._alphas:
