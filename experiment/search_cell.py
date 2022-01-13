@@ -11,9 +11,8 @@ import torch.nn.functional as F
 import torch.backends.cudnn as cudnn
 import torchvision.transforms as transform
 
-from util.datasets.hsi_dataset import get_training_dataloaders
-
 sys.path.append('..')
+from util.datasets.hsi_dataset import get_training_dataloaders
 from util.loss.loss import SegmentationLosses
 from util.datasets import get_dataset, datasets
 from util.utils import get_logger, save_checkpoint
