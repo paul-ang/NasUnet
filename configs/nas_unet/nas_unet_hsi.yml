@@ -21,6 +21,7 @@ searching:
     double_down_channel: False
     meta_node_num: 3
     grad_clip: 5
+    fold: 1
     train_portion: 0.5
     model_optimizer:
         name: 'adabound'

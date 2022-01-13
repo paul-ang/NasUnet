@@ -89,7 +89,7 @@ class SearchNetwork(object):
         #                                    sampler=torch.utils.data.sampler.SubsetRandomSampler(
         #                                        indices[split:num_train]),**kwargs)
 
-        self.train_queue, self.valid_queue, _ = get_training_dataloaders(self.cfg['searching']['batch_size'], self.cfg['searching']['n_workers'], '/projects/datasets/UOW-HSI-v2', fold=1)
+        self.train_queue, self.valid_queue, _ = get_training_dataloaders(self.cfg['searching']['batch_size'], self.cfg['searching']['n_workers'], '/projects/datasets/UOW-HSI-v2', fold=self.cfg['searching']['fold'])
         self.n_classes = 5
         self.in_channels = 25
 
